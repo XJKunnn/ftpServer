@@ -14,6 +14,7 @@
 
 #define MAXSIZE 512
 #define PORT 12345
+#define DATA_PORT 18888
 
 int sock_create(int port);
 
