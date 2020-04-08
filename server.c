@@ -1,8 +1,9 @@
 #include "server.h"
 
 void ser_process(int sockfd);
-int server_data_conn(int sock_control);
-int data_conn(int sock_control);
+
+int data_accept(int data_port);
+int create_data_port(int sock_control);
 
 int main(int argc, char* argv[]){
 	int sock_listen;	//listen socket in father process
@@ -112,32 +113,6 @@ int sock_accept(int sock_listen){
 	return sockfd;
 }
 
-//create data_socket to client
-int sock_connect(int port, char *host){
-	int sockfd;
-	struct sockaddr_in client_addr;
-
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-		printf("sockfd in sock_conn error\n");
-		return -1;
-	}
-
-	bzero(&client_addr, sizeof(client_addr));
-	client_addr.sin_family = AF_INET;
-	client_addr.sin_port = 18888;
-	client_addr.sin_addr.s_addr = inet_addr("192.168.16.107");
-
-	inet_pton(AF_INET, "192.168.16.107", &client_addr.sin_addr);
-
-	if((connect(sockfd, (struct sockaddr*)&client_addr, sizeof(client_addr))) < 0){
-		perror("conn in sock_conn");
-		return -1;
-	} else {
-		printf("success");
-	}
-
-	return sockfd;
-}
 
 //sock_control send reponse_code to client's sock_control
 /*
@@ -162,77 +137,59 @@ int send_response_code(int sockfd, int code){
 
 void ser_process(int sock_control){
 	int sock_data;
-	
+	int data_listen;
+	int data_port = 9000;
+
 	send_response_code(sock_control, 220);
 	
-	sock_data = server_data_conn(sock_control);
-	int rd;
-	if(recv(sock_data, &rd, sizeof(rd), 0) < 0){
-		perror("data recv");
+	int data_request;
+	if(recv(sock_control, &data_request, sizeof(data_request), 0) < 0){
+		perror("recv data request error");
+	}
+	
+	data_request = ntohl(data_request);
+	
+	if(data_request == 222){
+	
+		data_listen = create_data_port(data_port);
+	
+		if(send_response_code(sock_control,data_port) < 0){
+			perror("send data port error");
+			exit(1);
+		}
+
+		sock_data = data_accept(data_listen);
+	} else {
+		printf("data_request:%d\n", data_request);
 	}
 	send_response_code(sock_data, 626);
+	
 }
 
-int server_data_conn(int sock_control){
-	char buf[1024];
-	int wait;
-	int sock_data;
-
-	//wait for the client ack
-	if(recv(sock_control, &wait, sizeof(wait), 0) < 0){
-		printf("error in wait ack\n");
-		return -1;
-	} else {
-		printf("get ack: %d\n", wait);
-	}
-	
-	if((sock_data = data_conn(sock_control)) < 0){
-		perror("sock_data = data_conn");
-		return -1;
-	}
-	
-	//get client addr
-	//struct sockaddr_in client_addr;
-	//socklen_t len = sizeof(client_addr);
-	//getpeername(sock_control, (struct sockaddr*)&client_addr, &len);
-	//inet_ntop(AF_INET, &client_addr.sin_addr, buf, sizeof(buf));
-	//printf("buf info:%s,%d\n", buf, ntohs(client_addr.sin_port));
-
-/*
-	if(connect(sock_data, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0){
-		perror("sock_data conn error");
-		return -1;
-	} else {
-		printf("sock_data conn success\n");
-	}
-	*/
-	//init data conn with client 
-	/*
-	if((sock_data = sock_connect(DATA_PORT, buf)) < 0){
-		printf("sock_data conn error\n");
-		return -1;
-	}
-	*/
-	return sock_data;
-}
-
-int data_conn(int sock_control){
+int create_data_port(int data_port){
 	int data_listen;
-	int sock_data;
 
-	if((data_listen = sock_create(18888)) < 0){
-		perror("datalisten socket error");
+	if((data_listen = sock_create(data_port)) < 0){
+		perror("data_listen create error");
 		return -1;
 	}
 
-	send_response_code(sock_control, 221);
+	return data_listen;
+}
+
+int data_accept(int data_listen){
+	int sock_data;
 
 	if((sock_data = sock_accept(data_listen)) < 0){
-		perror("datalisten accept error");
+		perror("sock_data accept error");
 		return -1;
 	}
 
 	return sock_data;
 }
+
+
+
+
 
 
