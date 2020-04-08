@@ -191,28 +191,6 @@ int server_data_conn(int sock_control){
 		return -1;
 	}
 	
-	//get client addr
-	//struct sockaddr_in client_addr;
-	//socklen_t len = sizeof(client_addr);
-	//getpeername(sock_control, (struct sockaddr*)&client_addr, &len);
-	//inet_ntop(AF_INET, &client_addr.sin_addr, buf, sizeof(buf));
-	//printf("buf info:%s,%d\n", buf, ntohs(client_addr.sin_port));
-
-/*
-	if(connect(sock_data, (struct sockaddr*)&client_addr, sizeof(client_addr)) < 0){
-		perror("sock_data conn error");
-		return -1;
-	} else {
-		printf("sock_data conn success\n");
-	}
-	*/
-	//init data conn with client 
-	/*
-	if((sock_data = sock_connect(DATA_PORT, buf)) < 0){
-		printf("sock_data conn error\n");
-		return -1;
-	}
-	*/
 	return sock_data;
 }
 
