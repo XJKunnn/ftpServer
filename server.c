@@ -167,6 +167,7 @@ void ser_process(int sock_control){
 					exit(1);
 				}
 				file_to_client(sock_data, sock_control, filename);
+				send_response_code(sock_control, 383);
 			} else if(detail == 284){	//recv file from client
 			
 				file_to_server(sock_data, sock_control);
@@ -268,9 +269,10 @@ void file_to_client(int sock_data, int sock_control, char* filename){
 			printf("sending...\n");
 			
 		} while(num_read > 0);
-		send_response_code(sock_control, 383);		//file transport ok
 
 		fclose(fd);
+		server_recv_cmd(sock_control);
+		printf("send fd closed\n");
 	}
 }
 
@@ -304,24 +306,16 @@ void file_to_server(int sock_data, int sock_control){
 	FILE* fd = fopen(real_name, "w");
 	int size;
 	char* data[MAXSIZE];
-	int writeLoop = filesize / MAXSIZE;
-	int res = filesize % MAXSIZE;
+	int res = filesize;
 	
-	for(int i=0; i<writeLoop; i++){
+	while(res > 0){
 		if((size = recv(sock_data, &data, sizeof(data), 0)) > 0){
-			fwrite(data, 1, MAXSIZE, fd);
+			fwrite(data, 1, size, fd);
 			printf("size:%d\n", size);
 		}
+		res = res - size;
 	}
-	recv(sock_data, &data, sizeof(data), 0);
-	fwrite(data, 1, res, fd);
 	
-	/*
-	while((size = recv(sock_data, &data, sizeof(data), 0)) > 0){
-		fwrite(data, 1, size, fd);
-		printf("recv file...size=%d\n", size);
-	}
-	*/
 
 	if(size < 0){
 		perror("size error in upload file");
