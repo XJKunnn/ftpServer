@@ -12,9 +12,9 @@
 #include <dirent.h>
 #include <fcntl.h>
 
-#define MAXSIZE 512
-#define PORT 12345
-#define DATA_PORT 18888
+#define MAXSIZE 1024
+#define PORT 8000
+#define DATA_PORT 9000
 
 int sock_create(int port);
 

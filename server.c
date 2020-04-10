@@ -8,6 +8,7 @@ int server_recv_cmd(int sock_control);
 void file_to_client(int sock_data, int sock_control, char* filename);
 void file_to_server(int sock_data, int sock_control);
 int getFileSize(char *filename);
+int fileList(int sock_control, int sock_data);
 
 int main(int argc, char* argv[]){
 	int sock_listen;	//listen socket in father process
@@ -97,7 +98,8 @@ void ser_process(int sock_control){
 			
 			}else if(detail == 286){
 				//send the current direction info
-			
+				fileList(sock_control, sock_data);
+
 			} else {
 				send_response_code(sock_control, 300);	//bad detail code
 			}
@@ -113,6 +115,43 @@ void ser_process(int sock_control){
 	close(sock_control);
 	printf("child process end...\n");
 	return ;
+}
+
+//get server filelist
+int fileList(int sock_control, int sock_data){
+	char data[MAXSIZE];
+	size_t num_read;
+	FILE* fd;
+
+	int rs = system("ls -l ../ftpFile/ | grep ^[^d] | awk '{print $9}' > ../ftpFile/.filelist");
+	if(rs < 0){
+		printf("system shell fail\n");
+		return -1;
+	}
+
+	fd = fopen("../ftpFile/.filelist","r");
+	if(!fd){
+		printf("open .filelist error\n");
+		return -1;
+	}
+
+	fseek(fd, SEEK_SET, 0);
+
+	send_response_code(sock_control, 600);
+
+	memset(data, 0 ,MAXSIZE);
+	while((num_read = fread(data, 1, MAXSIZE, fd)) > 0){
+		if(send(sock_data, data, num_read, 0) < 0){
+			perror("error in send .filelist");
+			return -1;
+		}
+		memset(data, 0 ,MAXSIZE);
+	}
+
+	fclose(fd);
+	server_recv_cmd(sock_control);
+
+	return 0;
 }
 
 //create socket of server
@@ -244,19 +283,26 @@ void file_to_client(int sock_data, int sock_control, char* filename){
 	real_name[count] = '\0';
 	printf("%s\n", real_name);
 
+	char url[11 + count];
+	strcpy(url, "../ftpFile/");
+	strcat(url, real_name);
+
 	FILE* fd = NULL;
 	char data[MAXSIZE];
 	size_t num_read;
 
-	int filesize = getFileSize(real_name);
+	int filesize = getFileSize(url);
 	send_response_code(sock_control, filesize);		//send file size
 
-	fd = fopen(real_name,"r");
+	fd = fopen(url,"r");
+	int percent = 0, sum = 0, res = filesize;
 
 	if(!fd){
 		send_response_code(sock_control, 283);		//file not exist
 	} else {
 		send_response_code(sock_control, 382);		//file ready
+		printf("already send:  0%%");
+		/*
 		do{
 			num_read = fread(data, 1, MAXSIZE, fd);
 			if(num_read < 0){
@@ -266,13 +312,36 @@ void file_to_client(int sock_data, int sock_control, char* filename){
 			if(send(sock_data, data, num_read, 0) < 0){
 				perror("send file error");
 			}
-			printf("sending...\n");
-			
-		} while(num_read > 0);
-
+			sum += num_read;
+			res -= num_read;
+			percent = sum * 100 / filesize;
+			if(percent < 10){
+				printf("\b\b");
+			} else {
+				printf("\b\b\b");
+			}
+			printf("%d%%", percent);
+		} while(num_read > 0 && res > 0);
+		*/
+		int loop = filesize / MAXSIZE;
+		for(int j=0; j<loop; j++){
+			num_read = fread(data, 1, MAXSIZE, fd);
+			if(send(sock_data, data, num_read, 0) < 0){
+				perror("send file error");
+			}
+			sum += num_read;
+			res -= num_read;
+			printf("send sum:%d\n", sum);
+		}
+		num_read = fread(data, 1, res, fd);
+		if(send(sock_data, data, res, 0) < 0){
+			perror("send res error");
+		}
+		printf("send res:%d\n", res);
+		printf("finish send\n");
 		fclose(fd);
 		server_recv_cmd(sock_control);
-		printf("send fd closed\n");
+		printf("\nsend fd closed\n");
 	}
 }
 
@@ -302,18 +371,30 @@ void file_to_server(int sock_data, int sock_control){
 	
 	printf("filesize:%d\n", filesize);
 
-
-	FILE* fd = fopen(real_name, "w");
+	
+	char url[11 + count];
+	strcpy(url, "../ftpFile/");
+	strcat(url, real_name);
+	FILE* fd = fopen(url, "w");
 	int size;
 	char* data[MAXSIZE];
 	int res = filesize;
+	int percent;
 	
+	printf("file accept:  0%%");
 	while(res > 0){
 		if((size = recv(sock_data, &data, sizeof(data), 0)) > 0){
 			fwrite(data, 1, size, fd);
-			printf("size:%d\n", size);
+			//printf("size:%d\n", size);
 		}
 		res = res - size;
+		percent = (filesize - res) * 100 / filesize;
+		if(percent < 10){
+			printf("\b\b");
+		} else {
+			printf("\b\b\b");
+		}
+		printf("%d%%", percent);
 	}
 	
 
@@ -322,9 +403,10 @@ void file_to_server(int sock_data, int sock_control){
 	}
 
 	send_response_code(sock_control, 385);
-	printf("fd not close\n");
+	//printf("fd not close\n");
 	fclose(fd);
-	printf("fd closed\n");
+	printf("\nfile ac succeed\n");
+	//printf("fd closed\n");
 	//send_response_code(sock_control, 385);	//server recv succeed
 }
 
