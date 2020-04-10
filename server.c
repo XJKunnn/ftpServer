@@ -58,7 +58,62 @@ int main(int argc, char* argv[]){
 	return 0;
 }
 
+void ser_process(int sock_control){
+	int sock_data;
+	int data_listen;
+	int data_port = 9000;					//set random
+	int cmd = 0, detail = 0;
 
+	send_response_code(sock_control, 220);	//send welcome code
+	
+	while(1){
+		if((cmd = server_recv_cmd(sock_control)) < 0){
+			perror("get cmd error");
+			continue;
+		}
+		if(cmd == 280){		//data request
+			data_listen = create_data_port(data_port);
+			if(send_response_code(sock_control,data_port) < 0){
+				perror("send data port error");
+				exit(1);
+			}
+			sock_data = data_accept(data_listen);
+			send_response_code(sock_data, 626);		//sock_data accept code
+			if((detail = server_recv_cmd(sock_control)) < 0){
+				perror("get detail failed");
+				exit(1);
+			}
+			if(detail == 282){
+				char filename[128];
+				if((recv(sock_control, &filename, sizeof(filename), 0)) < 0){
+					perror("get filename failed");
+					exit(1);
+				}
+				file_to_client(sock_data, sock_control, filename);
+				send_response_code(sock_control, 383);
+			} else if(detail == 284){	//recv file from client
+			
+				file_to_server(sock_data, sock_control);
+			
+			}else if(detail == 286){
+				//send the current direction info
+			
+			} else {
+				send_response_code(sock_control, 300);	//bad detail code
+			}
+			close(sock_data);
+		} else if(cmd == 1000){
+			//quit
+			break;
+		} else {
+			break;
+		}
+	}
+	close(data_listen);
+	close(sock_control);
+	printf("child process end...\n");
+	return ;
+}
 
 //create socket of server
 int sock_create(int port){
@@ -135,62 +190,7 @@ int send_response_code(int sockfd, int code){
 	return 0;
 }
 
-void ser_process(int sock_control){
-	int sock_data;
-	int data_listen;
-	int data_port = 9000;					//set random
-	int cmd = 0, detail = 0;
 
-	send_response_code(sock_control, 220);	//send welcome code
-	
-	while(1){
-		if((cmd = server_recv_cmd(sock_control)) < 0){
-			perror("get cmd error");
-			continue;
-		}
-		if(cmd == 280){		//data request
-			data_listen = create_data_port(data_port);
-			if(send_response_code(sock_control,data_port) < 0){
-				perror("send data port error");
-				exit(1);
-			}
-			sock_data = data_accept(data_listen);
-			send_response_code(sock_data, 626);		//sock_data accept code
-			if((detail = server_recv_cmd(sock_control)) < 0){
-				perror("get detail failed");
-				exit(1);
-			}
-			if(detail == 282){
-				char filename[128];
-				if((recv(sock_control, &filename, sizeof(filename), 0)) < 0){
-					perror("get filename failed");
-					exit(1);
-				}
-				file_to_client(sock_data, sock_control, filename);
-				send_response_code(sock_control, 383);
-			} else if(detail == 284){	//recv file from client
-			
-				file_to_server(sock_data, sock_control);
-			
-			}else if(detail == 286){
-				//send the current direction info
-			
-			} else {
-				send_response_code(sock_control, 300);	//bad detail code
-			}
-			close(sock_data);
-		} else if(cmd == 1000){
-			//quit
-			break;
-		} else {
-			break;
-		}
-	}
-	close(data_listen);
-	close(sock_control);
-	printf("child process end...\n");
-	return ;
-}
 
 int server_recv_cmd(int sock_control){
 	int command;
