@@ -15,7 +15,7 @@ int main(int argc, char* argv[]){
 	int sock_control;	//control socket for client connection
 	int port;
 	int pid;
-
+    //xixi
 	if(argc != 2){
 		printf("input the server port\n");
 		exit(0);
